@@ -1,20 +1,31 @@
 import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase';
 
 const DEFAULT_DRIVERS = [
-  { id: '11111111-1111-4111-8111-111111111101', name: 'Ramesh', phone: '9848012345' },
-  { id: '11111111-1111-4111-8111-111111111102', name: 'Suresh', phone: '9848023456' },
-  { id: '11111111-1111-4111-8111-111111111103', name: 'Mahesh', phone: '9848034567' },
-  { id: '11111111-1111-4111-8111-111111111104', name: 'Ravi', phone: '9848045678' },
-  { id: '11111111-1111-4111-8111-111111111105', name: 'Kiran', phone: '9848056789' },
-  { id: '11111111-1111-4111-8111-111111111106', name: 'Anil', phone: '9848067890' },
-  { id: '11111111-1111-4111-8111-111111111107', name: 'Rajesh', phone: '9848078901' },
-  { id: '11111111-1111-4111-8111-111111111108', name: 'Srinu', phone: '9848089012' },
-  { id: '11111111-1111-4111-8111-111111111109', name: 'Vijay', phone: '9848090123' },
-  { id: '11111111-1111-4111-8111-111111111110', name: 'Naresh', phone: '9848099999' },
+  { id: '11111111-1111-4111-8111-111111111101', name: 'Ramesh', phone: '9848011223' },
+  { id: '11111111-1111-4111-8111-111111111102', name: 'Suresh', phone: '9848022334' },
+  { id: '11111111-1111-4111-8111-111111111103', name: 'Mahesh', phone: '9848033445' },
+  { id: '11111111-1111-4111-8111-111111111104', name: 'Ravi', phone: '9848044556' },
+  { id: '11111111-1111-4111-8111-111111111105', name: 'Kiran', phone: '9848055667' },
+  { id: '11111111-1111-4111-8111-111111111106', name: 'Anil', phone: '9848066778' },
+  { id: '11111111-1111-4111-8111-111111111107', name: 'Rajesh', phone: '9848077889' },
+  { id: '11111111-1111-4111-8111-111111111108', name: 'Srinu', phone: '9848088990' },
+  { id: '11111111-1111-4111-8111-111111111109', name: 'Vijay', phone: '9848099001' },
+  { id: '11111111-1111-4111-8111-111111111110', name: 'Naresh', phone: '9848012349' },
 ];
 
-const LOCAL_DRIVERS_KEY = 'dtb_drivers_v1';
-const LOCAL_RECORDS_KEY = 'dtb_records_v1';
+const LOCAL_DRIVERS_KEY = 'dtb_drivers_v2';
+const LOCAL_RECORDS_KEY = 'dtb_records_v2';
+
+// Deduplicate helper
+const deduplicateDrivers = (driversList) => {
+  const seen = new Set();
+  return driversList.filter((d) => {
+    const key = d.name.trim().toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
 
 // Seed sample records for Ramesh matching prompt's example (Oct 01 - Oct 08)
 const getInitialSampleRecords = () => {
@@ -37,14 +48,6 @@ const getInitialSampleRecords = () => {
     });
   });
 
-  // Add some sample records for Suresh and Mahesh as well
-  const sureshId = DEFAULT_DRIVERS[1].id;
-  records.push(
-    { id: 'sample-suresh-1', driver_id: sureshId, date: `${year}-${month}-01`, amount: 850 },
-    { id: 'sample-suresh-2', driver_id: sureshId, date: `${year}-${month}-02`, amount: 850 },
-    { id: 'sample-suresh-8', driver_id: sureshId, date: `${year}-${month}-08`, amount: 850 },
-  );
-
   return records;
 };
 
@@ -58,13 +61,12 @@ const initLocalStorage = () => {
   }
 };
 
-// Initialize right away
 initLocalStorage();
 
 export const dataService = {
   isConfigured: () => isSupabaseConfigured(),
 
-  // Get all drivers
+  // Get all drivers (always deduplicated)
   async getDrivers() {
     const supabase = getSupabaseClient();
     if (supabase) {
@@ -77,7 +79,7 @@ export const dataService = {
         if (error) throw error;
         
         if (data && data.length > 0) {
-          return data;
+          return deduplicateDrivers(data);
         } else {
           // If Supabase table is empty, seed default drivers
           const { data: inserted, error: insertErr } = await supabase
@@ -85,7 +87,7 @@ export const dataService = {
             .insert(DEFAULT_DRIVERS.map(d => ({ name: d.name, phone: d.phone })))
             .select();
           if (!insertErr && inserted) {
-            return inserted;
+            return deduplicateDrivers(inserted);
           }
         }
       } catch (err) {
@@ -96,23 +98,27 @@ export const dataService = {
     // Local fallback
     try {
       const stored = localStorage.getItem(LOCAL_DRIVERS_KEY);
-      return stored ? JSON.parse(stored) : DEFAULT_DRIVERS;
+      const parsed = stored ? JSON.parse(stored) : DEFAULT_DRIVERS;
+      return deduplicateDrivers(parsed);
     } catch {
       return DEFAULT_DRIVERS;
     }
   },
 
-  // Add a new driver
-  async addDriver(name, phone = '') {
+  // Add a new driver (phone is mandatory)
+  async addDriver(name, phone) {
     const trimmedName = name.trim();
+    const trimmedPhone = (phone || '').trim();
+
     if (!trimmedName) throw new Error('Driver name is required');
+    if (!trimmedPhone) throw new Error('Phone number is required');
 
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
         const { data, error } = await supabase
           .from('drivers')
-          .insert({ name: trimmedName, phone: phone.trim() || null })
+          .insert({ name: trimmedName, phone: trimmedPhone })
           .select()
           .single();
         if (error) throw error;
@@ -127,7 +133,7 @@ export const dataService = {
     const newDriver = {
       id: crypto.randomUUID ? crypto.randomUUID() : `driver-${Date.now()}`,
       name: trimmedName,
-      phone: phone.trim() || null,
+      phone: trimmedPhone,
       created_at: new Date().toISOString(),
     };
     drivers.push(newDriver);
@@ -136,16 +142,19 @@ export const dataService = {
   },
 
   // Update an existing driver
-  async updateDriver(id, name, phone = '') {
+  async updateDriver(id, name, phone) {
     const trimmedName = name.trim();
+    const trimmedPhone = (phone || '').trim();
+
     if (!trimmedName) throw new Error('Driver name is required');
+    if (!trimmedPhone) throw new Error('Phone number is required');
 
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
         const { data, error } = await supabase
           .from('drivers')
-          .update({ name: trimmedName, phone: phone.trim() || null })
+          .update({ name: trimmedName, phone: trimmedPhone })
           .eq('id', id)
           .select()
           .single();
@@ -159,7 +168,7 @@ export const dataService = {
     const drivers = await this.getDrivers();
     const index = drivers.findIndex(d => d.id === id);
     if (index !== -1) {
-      drivers[index] = { ...drivers[index], name: trimmedName, phone: phone.trim() || null };
+      drivers[index] = { ...drivers[index], name: trimmedName, phone: trimmedPhone };
       localStorage.setItem(LOCAL_DRIVERS_KEY, JSON.stringify(drivers));
       return drivers[index];
     }
@@ -183,17 +192,15 @@ export const dataService = {
     const filtered = drivers.filter(d => d.id !== id);
     localStorage.setItem(LOCAL_DRIVERS_KEY, JSON.stringify(filtered));
 
-    // Also remove driver's daily records in local storage
     const records = this._getLocalRecords().filter(r => r.driver_id !== id);
     localStorage.setItem(LOCAL_RECORDS_KEY, JSON.stringify(records));
     return true;
   },
 
-  // Fetch all daily records for a specific driver and month (year: 2026, month: 10)
+  // Fetch all daily records for a specific driver and month
   async getMonthlyRecords(driverId, year, month) {
     const formattedMonth = String(month).padStart(2, '0');
     const startDate = `${year}-${formattedMonth}-01`;
-    // Last day of month
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${formattedMonth}-${String(lastDay).padStart(2, '0')}`;
 
@@ -222,8 +229,7 @@ export const dataService = {
     });
   },
 
-  // Save or update a single daily record (upsert)
-  // If amount is null or empty string, remove the record
+  // Save or update a single daily record
   async saveDailyRecord(driverId, date, amount) {
     const supabase = getSupabaseClient();
 
@@ -242,7 +248,6 @@ export const dataService = {
         }
       }
 
-      // Local remove
       const records = this._getLocalRecords();
       const filtered = records.filter(r => !(r.driver_id === driverId && r.date === date));
       localStorage.setItem(LOCAL_RECORDS_KEY, JSON.stringify(filtered));
@@ -256,6 +261,7 @@ export const dataService = {
 
     if (supabase) {
       try {
+        // First try standard upsert
         const { data, error } = await supabase
           .from('daily_records')
           .upsert(
@@ -270,14 +276,41 @@ export const dataService = {
           .select()
           .single();
 
-        if (error) throw error;
-        return { success: true, record: data };
+        if (!error && data) {
+          return { success: true, record: data };
+        }
+
+        // Fallback: If unique constraint is missing on Supabase (error 42P10),
+        // safely check existing row and update or insert:
+        const { data: existing } = await supabase
+          .from('daily_records')
+          .select('id')
+          .eq('driver_id', driverId)
+          .eq('date', date)
+          .maybeSingle();
+
+        if (existing) {
+          const { data: updated, error: uErr } = await supabase
+            .from('daily_records')
+            .update({ amount: numAmount, updated_at: new Date().toISOString() })
+            .eq('id', existing.id)
+            .select()
+            .single();
+          if (!uErr && updated) return { success: true, record: updated };
+        } else {
+          const { data: inserted, error: iErr } = await supabase
+            .from('daily_records')
+            .insert({ driver_id: driverId, date, amount: numAmount })
+            .select()
+            .single();
+          if (!iErr && inserted) return { success: true, record: inserted };
+        }
       } catch (err) {
-        console.warn('Supabase upsert error, saving locally:', err);
+        console.warn('Supabase saveDailyRecord error:', err);
       }
     }
 
-    // Local upsert
+    // Local storage fallback
     const records = this._getLocalRecords();
     const existingIndex = records.findIndex(r => r.driver_id === driverId && r.date === date);
 
@@ -301,7 +334,6 @@ export const dataService = {
     return { success: true, amount: numAmount };
   },
 
-  // Helper to get local records safely
   _getLocalRecords() {
     try {
       const stored = localStorage.getItem(LOCAL_RECORDS_KEY);
@@ -311,39 +343,6 @@ export const dataService = {
     }
   },
 
-  // Fetch today's records for all drivers (to show today's status on Driver List)
-  async getTodayRecordsForAllDrivers(todayDateString) {
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('daily_records')
-          .select('driver_id, amount')
-          .eq('date', todayDateString);
-        if (!error && data) {
-          const map = {};
-          data.forEach(item => {
-            map[item.driver_id] = item.amount;
-          });
-          return map;
-        }
-      } catch (err) {
-        console.warn('Supabase getTodayRecords error:', err);
-      }
-    }
-
-    // Local fallback
-    const records = this._getLocalRecords();
-    const map = {};
-    records.forEach(r => {
-      if (r.date === todayDateString) {
-        map[r.driver_id] = r.amount;
-      }
-    });
-    return map;
-  },
-
-  // Reset to default sample data (for easy testing)
   resetDemoData() {
     localStorage.setItem(LOCAL_DRIVERS_KEY, JSON.stringify(DEFAULT_DRIVERS));
     localStorage.setItem(LOCAL_RECORDS_KEY, JSON.stringify(getInitialSampleRecords()));

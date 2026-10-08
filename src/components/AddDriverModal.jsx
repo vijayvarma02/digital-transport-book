@@ -11,21 +11,35 @@ export default function AddDriverModal({ isOpen, onClose, onAddDriver }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) {
+    const trimmedName = name.trim();
+    const trimmedPhone = phone.trim();
+
+    if (!trimmedName) {
       setError('Please enter the driver’s name');
+      return;
+    }
+
+    if (!trimmedPhone) {
+      setError('Please enter the phone number');
+      return;
+    }
+
+    // Basic 10-digit validation
+    const digitsOnly = trimmedPhone.replace(/\D/g, '');
+    if (digitsOnly.length < 10) {
+      setError('Please enter a valid 10-digit phone number');
       return;
     }
 
     setIsSubmitting(true);
     setError('');
     try {
-      await onAddDriver(trimmed, phone.trim());
+      await onAddDriver(trimmedName, trimmedPhone);
       setName('');
       setPhone('');
       onClose();
-    } catch {
-      setError('Failed to add driver. Please try again.');
+    } catch (err) {
+      setError(err.message || 'Failed to add driver. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -76,15 +90,16 @@ export default function AddDriverModal({ isOpen, onClose, onAddDriver }) {
 
           <div>
             <label htmlFor="driver-phone-input" className="block text-sm font-semibold text-slate-700 mb-1.5">
-              Phone Number <span className="text-xs text-slate-400 font-normal">(Optional)</span>
+              Phone Number <span className="text-red-500">*</span>
             </label>
             <input
               id="driver-phone-input"
               type="tel"
               inputMode="tel"
+              required
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="e.g. 9848012345"
+              placeholder="e.g. 9848011223"
               className="w-full text-lg font-medium text-slate-900 px-4 py-3 bg-slate-50 border-2 border-slate-300 rounded-xl focus:outline-none focus:border-blue-600 focus:bg-white transition-colors"
             />
           </div>
