@@ -1,33 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ChevronRight, Plus, Settings } from 'lucide-react';
-import { MONTH_NAMES, getTodayDateString, formatCurrency } from '../utils/dateUtils';
+import { MONTH_NAMES } from '../utils/dateUtils';
 import { dataService } from '../services/dataService';
 import AddDriverModal from './AddDriverModal';
 import DatabaseSettingsModal from './DatabaseSettingsModal';
 
 export default function DriverList({ onSelectDriver, selectedMonth, selectedYear }) {
   const [drivers, setDrivers] = useState([]);
-  const [todayRecords, setTodayRecords] = useState({});
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDbModalOpen, setIsDbModalOpen] = useState(false);
 
-  const todayStr = getTodayDateString();
   const currentMonthName = MONTH_NAMES[selectedMonth - 1];
 
-  const loadDriversData = React.useCallback(async () => {
+  const loadDriversData = useCallback(async () => {
     setLoading(true);
     try {
       const driverList = await dataService.getDrivers();
       setDrivers(driverList);
-      const todayMap = await dataService.getTodayRecordsForAllDrivers(todayStr);
-      setTodayRecords(todayMap);
     } catch (err) {
       console.error('Failed to load drivers:', err);
     } finally {
       setLoading(false);
     }
-  }, [todayStr]);
+  }, []);
 
   useEffect(() => {
     loadDriversData();
@@ -77,9 +73,6 @@ export default function DriverList({ onSelectDriver, selectedMonth, selectedYear
         ) : (
           <div className="space-y-2.5">
             {drivers.map((driver) => {
-              const todayAmount = todayRecords[driver.id];
-              const hasTodayEntry = todayAmount !== undefined && todayAmount !== null;
-
               return (
                 <button
                   key={driver.id}
@@ -91,23 +84,14 @@ export default function DriverList({ onSelectDriver, selectedMonth, selectedYear
                       {driver.name}
                     </span>
                     {driver.phone && (
-                      <span className="text-xs text-slate-400 font-medium block mt-0.5">
+                      <span className="text-sm text-slate-500 font-medium block mt-0.5">
                         {driver.phone}
                       </span>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    {hasTodayEntry ? (
-                      <span className="px-2.5 py-1 text-xs font-bold text-emerald-800 bg-emerald-100 rounded-md">
-                        Today: {formatCurrency(todayAmount)}
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 text-xs font-medium text-slate-400 bg-slate-100 rounded-md">
-                        Today: —
-                      </span>
-                    )}
-                    <ChevronRight size={22} className="text-slate-400" />
+                  <div className="shrink-0">
+                    <ChevronRight size={24} className="text-slate-400" />
                   </div>
                 </button>
               );
