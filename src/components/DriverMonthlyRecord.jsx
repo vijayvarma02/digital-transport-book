@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, ChevronDown, ArrowLeft, Download, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ArrowLeft, Download, FileText, Pencil } from 'lucide-react';
 import {
   MONTH_NAMES,
   getDaysInMonth,
@@ -9,6 +9,7 @@ import { exportDriverMonthlyPDF } from '../utils/pdfExport';
 import { dataService } from '../services/dataService';
 import DailyEntryModal from './DailyEntryModal';
 import MonthPickerModal from './MonthPickerModal';
+import EditDriverModal from './EditDriverModal';
 
 export default function DriverMonthlyRecord({
   driver,
@@ -17,6 +18,7 @@ export default function DriverMonthlyRecord({
   initialMonth,
   onMonthChange,
 }) {
+  const [currentDriver, setCurrentDriver] = useState(driver);
   const [year, setYear] = useState(initialYear);
   const [month, setMonth] = useState(initialMonth);
   const [recordsMap, setRecordsMap] = useState({});
@@ -26,6 +28,7 @@ export default function DriverMonthlyRecord({
   // Modal states
   const [selectedDateForEdit, setSelectedDateForEdit] = useState(null);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [isEditDriverOpen, setIsEditDriverOpen] = useState(false);
 
   const todayRowRef = useRef(null);
 
@@ -33,7 +36,7 @@ export default function DriverMonthlyRecord({
   const loadRecords = useCallback(async (y, m) => {
     setLoading(true);
     try {
-      const records = await dataService.getMonthlyRecords(driver.id, y, m);
+      const records = await dataService.getMonthlyRecords(currentDriver.id, y, m);
       const map = {};
       records.forEach((rec) => {
         map[rec.date] = rec.amount;
@@ -44,7 +47,7 @@ export default function DriverMonthlyRecord({
     } finally {
       setLoading(false);
     }
-  }, [driver.id]);
+  }, [currentDriver.id]);
 
   useEffect(() => {
     loadRecords(year, month);
@@ -111,9 +114,9 @@ export default function DriverMonthlyRecord({
     if (onMonthChange) onMonthChange(newYear, newMonth);
   };
 
-  // Save record handler (called from DailyEntryModal)
+  // Save daily record handler
   const handleSaveRecord = async (dateStr, newAmount) => {
-    await dataService.saveDailyRecord(driver.id, dateStr, newAmount);
+    await dataService.saveDailyRecord(currentDriver.id, dateStr, newAmount);
     setRecordsMap((prev) => {
       const updated = { ...prev };
       if (newAmount === null) {
@@ -125,13 +128,25 @@ export default function DriverMonthlyRecord({
     });
   };
 
+  // Update driver details handler
+  const handleUpdateDriver = async (id, newName, newPhone) => {
+    const updated = await dataService.updateDriver(id, newName, newPhone);
+    setCurrentDriver(updated);
+  };
+
+  // Delete driver handler
+  const handleDeleteDriver = async (id) => {
+    await dataService.deleteDriver(id);
+    onBack();
+  };
+
   // PDF Export handler
   const handleExportPDF = () => {
     setIsExporting(true);
     try {
       exportDriverMonthlyPDF({
-        driverName: driver.name,
-        driverPhone: driver.phone,
+        driverName: currentDriver.name,
+        driverPhone: currentDriver.phone,
         year,
         month,
         daysInMonth,
@@ -152,7 +167,7 @@ export default function DriverMonthlyRecord({
       {/* Top Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-xs">
         <div className="max-w-md mx-auto px-4 pt-4 pb-3">
-          {/* Back button + Driver Name + Quick PDF Export */}
+          {/* Back button + Driver Name + Edit pencil + Quick PDF Export */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <button
@@ -164,12 +179,23 @@ export default function DriverMonthlyRecord({
                 <ArrowLeft size={24} className="stroke-[2.5]" />
               </button>
               <div className="flex-1 min-w-0">
-                <h1 className="text-2xl font-extrabold text-slate-900 truncate">
-                  {driver.name}
-                </h1>
-                {driver.phone && (
+                <div className="flex items-center gap-1.5">
+                  <h1 className="text-2xl font-extrabold text-slate-900 truncate">
+                    {currentDriver.name}
+                  </h1>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditDriverOpen(true)}
+                    className="p-1.5 text-slate-400 hover:text-blue-700 active:bg-blue-50 rounded-lg min-h-[40px] min-w-[40px] flex items-center justify-center transition-colors"
+                    title="Edit driver name or phone"
+                    aria-label="Edit driver name or phone"
+                  >
+                    <Pencil size={17} />
+                  </button>
+                </div>
+                {currentDriver.phone && (
                   <p className="text-xs text-slate-500 font-medium">
-                    {driver.phone}
+                    {currentDriver.phone}
                   </p>
                 )}
               </div>
@@ -234,7 +260,7 @@ export default function DriverMonthlyRecord({
               <div className="text-right">Amount</div>
             </div>
 
-            {/* Daily Table Rows */}
+            {/* Daily Table Rows - Tap any row to edit that day's amount */}
             <div className="divide-y divide-slate-100">
               {daysInMonth.map((dayItem) => {
                 const amount = recordsMap[dayItem.dateString];
@@ -333,7 +359,7 @@ export default function DriverMonthlyRecord({
           key={selectedDateForEdit}
           isOpen={Boolean(selectedDateForEdit)}
           onClose={() => setSelectedDateForEdit(null)}
-          driverName={driver.name}
+          driverName={currentDriver.name}
           dateString={selectedDateForEdit}
           currentAmount={recordsMap[selectedDateForEdit]}
           onSave={handleSaveRecord}
@@ -348,6 +374,18 @@ export default function DriverMonthlyRecord({
         currentMonth={month}
         onSelectMonth={handleSelectMonth}
       />
+
+      {/* Edit Driver Details Modal */}
+      {isEditDriverOpen && (
+        <EditDriverModal
+          key={`${currentDriver.id}-${isEditDriverOpen}`}
+          isOpen={isEditDriverOpen}
+          onClose={() => setIsEditDriverOpen(false)}
+          driver={currentDriver}
+          onUpdateDriver={handleUpdateDriver}
+          onDeleteDriver={handleDeleteDriver}
+        />
+      )}
     </div>
   );
 }
