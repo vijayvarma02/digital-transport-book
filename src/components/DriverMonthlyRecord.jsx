@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, ChevronDown, ArrowLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ArrowLeft, Download, FileText } from 'lucide-react';
 import {
   MONTH_NAMES,
   getDaysInMonth,
   formatCurrency,
 } from '../utils/dateUtils';
+import { exportDriverMonthlyPDF } from '../utils/pdfExport';
 import { dataService } from '../services/dataService';
 import DailyEntryModal from './DailyEntryModal';
 import MonthPickerModal from './MonthPickerModal';
@@ -20,6 +21,7 @@ export default function DriverMonthlyRecord({
   const [month, setMonth] = useState(initialMonth);
   const [recordsMap, setRecordsMap] = useState({});
   const [loading, setLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Modal states
   const [selectedDateForEdit, setSelectedDateForEdit] = useState(null);
@@ -123,6 +125,26 @@ export default function DriverMonthlyRecord({
     });
   };
 
+  // PDF Export handler
+  const handleExportPDF = () => {
+    setIsExporting(true);
+    try {
+      exportDriverMonthlyPDF({
+        driverName: driver.name,
+        driverPhone: driver.phone,
+        year,
+        month,
+        daysInMonth,
+        recordsMap,
+        totalAmount,
+      });
+    } catch (err) {
+      console.error('Failed to generate PDF:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const currentMonthName = MONTH_NAMES[month - 1];
 
   return (
@@ -130,26 +152,39 @@ export default function DriverMonthlyRecord({
       {/* Top Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-xs">
         <div className="max-w-md mx-auto px-4 pt-4 pb-3">
-          {/* Back button + Driver Name */}
-          <div className="flex items-center gap-3">
+          {/* Back button + Driver Name + Quick PDF Export */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={onBack}
+                className="p-2 -ml-2 text-slate-700 hover:text-slate-900 active:bg-slate-100 rounded-xl min-h-[48px] min-w-[48px] flex items-center justify-center font-bold"
+                aria-label="Back to drivers list"
+              >
+                <ArrowLeft size={24} className="stroke-[2.5]" />
+              </button>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl font-extrabold text-slate-900 truncate">
+                  {driver.name}
+                </h1>
+                {driver.phone && (
+                  <p className="text-xs text-slate-500 font-medium">
+                    {driver.phone}
+                  </p>
+                )}
+              </div>
+            </div>
+
             <button
               type="button"
-              onClick={onBack}
-              className="p-2 -ml-2 text-slate-700 hover:text-slate-900 active:bg-slate-100 rounded-xl min-h-[48px] min-w-[48px] flex items-center justify-center font-bold"
-              aria-label="Back to drivers list"
+              onClick={handleExportPDF}
+              disabled={isExporting}
+              className="px-3 py-2 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-700 border border-blue-200 rounded-xl font-bold text-xs flex items-center gap-1.5 min-h-[44px] shrink-0"
+              title="Download Monthly PDF"
             >
-              <ArrowLeft size={24} className="stroke-[2.5]" />
+              <FileText size={16} />
+              <span>PDF</span>
             </button>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-extrabold text-slate-900 truncate">
-                {driver.name}
-              </h1>
-              {driver.phone && (
-                <p className="text-xs text-slate-500 font-medium">
-                  {driver.phone}
-                </p>
-              )}
-            </div>
           </div>
 
           {/* Month Navigation Row */}
@@ -268,22 +303,27 @@ export default function DriverMonthlyRecord({
         )}
       </main>
 
-      {/* Sticky Bottom Total Bar */}
-      <footer className="fixed bottom-0 inset-x-0 bg-white border-t-2 border-slate-200 py-4 px-6 z-20 shadow-lg">
-        <div className="max-w-md mx-auto flex items-center justify-between">
+      {/* Sticky Bottom Total Bar with PDF Export */}
+      <footer className="fixed bottom-0 inset-x-0 bg-white border-t-2 border-slate-200 py-3.5 px-5 z-20 shadow-lg">
+        <div className="max-w-md mx-auto flex items-center justify-between gap-3">
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
               Monthly Total
             </span>
-            <span className="text-xl font-extrabold text-slate-900">
-              Total
-            </span>
-          </div>
-          <div className="text-right">
             <span className="text-2xl font-black text-blue-900 tracking-tight tabular-nums">
               {formatCurrency(totalAmount)}
             </span>
           </div>
+
+          <button
+            type="button"
+            onClick={handleExportPDF}
+            disabled={isExporting}
+            className="px-4 py-2.5 bg-blue-700 hover:bg-blue-800 active:bg-blue-900 text-white rounded-xl font-bold text-sm flex items-center gap-2 shadow-xs min-h-[48px] transition-colors"
+          >
+            <Download size={18} className="stroke-[2.5]" />
+            <span>{isExporting ? 'Creating PDF...' : 'Download PDF'}</span>
+          </button>
         </div>
       </footer>
 
