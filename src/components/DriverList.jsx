@@ -1,15 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
-import { MONTH_NAMES } from '../utils/dateUtils';
 import { dataService } from '../services/dataService';
 import AddDriverModal from './AddDriverModal';
 
-export default function DriverList({ onSelectDriver, selectedMonth, selectedYear }) {
+export default function DriverList({ onSelectDriver }) {
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-
-  const currentMonthName = MONTH_NAMES[selectedMonth - 1];
 
   const loadDriversData = useCallback(async () => {
     setLoading(true);
@@ -40,9 +37,6 @@ export default function DriverList({ onSelectDriver, selectedMonth, selectedYear
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
             Driver Records
           </h1>
-          <p className="text-base font-semibold text-blue-800 mt-1">
-            {currentMonthName} {selectedYear}
-          </p>
         </div>
       </header>
 

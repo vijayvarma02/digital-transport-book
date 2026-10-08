@@ -50,11 +50,7 @@ export default function App() {
             }}
           />
         ) : (
-          <DriverList
-            onSelectDriver={handleSelectDriver}
-            selectedMonth={selectedMonth}
-            selectedYear={selectedYear}
-          />
+          <DriverList onSelectDriver={handleSelectDriver} />
         )}
       </div>
     </div>
