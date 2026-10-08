@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronRight, Plus, Settings } from 'lucide-react';
+import { ChevronRight, Plus } from 'lucide-react';
 import { MONTH_NAMES } from '../utils/dateUtils';
 import { dataService } from '../services/dataService';
 import AddDriverModal from './AddDriverModal';
-import DatabaseSettingsModal from './DatabaseSettingsModal';
 
 export default function DriverList({ onSelectDriver, selectedMonth, selectedYear }) {
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isDbModalOpen, setIsDbModalOpen] = useState(false);
 
   const currentMonthName = MONTH_NAMES[selectedMonth - 1];
 
@@ -34,29 +32,14 @@ export default function DriverList({ onSelectDriver, selectedMonth, selectedYear
     setDrivers((prev) => [...prev, newDriver]);
   };
 
-  const handleResetDemo = () => {
-    dataService.resetDemoData();
-    loadDriversData();
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-12">
       {/* Top Header Bar */}
       <header className="bg-white border-b border-slate-200 px-5 pt-6 pb-5 sticky top-0 z-10 shadow-xs">
         <div className="max-w-md mx-auto">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Driver Records
-            </h1>
-            <button
-              onClick={() => setIsDbModalOpen(true)}
-              className="p-2 -mr-2 text-slate-400 hover:text-slate-600 rounded-full active:bg-slate-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
-              title="Database / Settings"
-              aria-label="Settings"
-            >
-              <Settings size={20} />
-            </button>
-          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Driver Records
+          </h1>
           <p className="text-base font-semibold text-blue-800 mt-1">
             {currentMonthName} {selectedYear}
           </p>
@@ -112,18 +95,11 @@ export default function DriverList({ onSelectDriver, selectedMonth, selectedYear
         )}
       </main>
 
-      {/* Modals */}
+      {/* Add Driver Modal */}
       <AddDriverModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAddDriver={handleAddDriver}
-      />
-
-      <DatabaseSettingsModal
-        isOpen={isDbModalOpen}
-        onClose={() => setIsDbModalOpen(false)}
-        onConfigChanged={loadDriversData}
-        onResetDemo={handleResetDemo}
       />
     </div>
   );
