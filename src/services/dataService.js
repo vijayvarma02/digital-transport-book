@@ -65,284 +65,91 @@ initLocalStorage();
 
 export const dataService = {
   isConfigured: () => isSupabaseConfigured(),
-
-  // Get all drivers (always deduplicated)
   async getDrivers() {
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('drivers')
-          .select('*')
-          .order('name');
-        
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          return deduplicateDrivers(data);
-        } else {
-          // If Supabase table is empty, seed default drivers
-          const { data: inserted, error: insertErr } = await supabase
-            .from('drivers')
-            .insert(DEFAULT_DRIVERS.map(d => ({ name: d.name, phone: d.phone })))
-            .select();
-          if (!insertErr && inserted) {
-            return deduplicateDrivers(inserted);
-          }
-        }
-      } catch (err) {
-        console.warn('Supabase fetchDrivers error, falling back to local storage:', err);
-      }
+    const client = getSupabaseClient();
+    if (client) {
+      const { data, error } = await client.from('drivers').select('*').order('name');
+      if (error) throw error;
+      return data || [];
     }
-
-    // Local fallback
-    try {
-      const stored = localStorage.getItem(LOCAL_DRIVERS_KEY);
-      const parsed = stored ? JSON.parse(stored) : DEFAULT_DRIVERS;
-      return deduplicateDrivers(parsed);
-    } catch {
-      return DEFAULT_DRIVERS;
-    }
+    return deduplicateDrivers(JSON.parse(localStorage.getItem(LOCAL_DRIVERS_KEY) || '[]'));
   },
-
-  // Add a new driver (phone is mandatory)
   async addDriver(name, phone) {
-    const trimmedName = name.trim();
-    const trimmedPhone = (phone || '').trim();
-
-    if (!trimmedName) throw new Error('Driver name is required');
-    if (!trimmedPhone) throw new Error('Phone number is required');
-
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('drivers')
-          .insert({ name: trimmedName, phone: trimmedPhone })
-          .select()
-          .single();
-        if (error) throw error;
-        return data;
-      } catch (err) {
-        console.warn('Supabase addDriver error:', err);
-      }
+    name = name.trim(); phone = phone.trim();
+    if (!name || !phone) throw new Error('Driver name and phone are required');
+    const client = getSupabaseClient();
+    if (client) {
+      const { data, error } = await client.from('drivers').insert({ name, phone }).select().single();
+      if (error) throw error;
+      return data;
     }
-
-    // Local fallback
-    const drivers = await this.getDrivers();
-    const newDriver = {
-      id: crypto.randomUUID ? crypto.randomUUID() : `driver-${Date.now()}`,
-      name: trimmedName,
-      phone: trimmedPhone,
-      created_at: new Date().toISOString(),
-    };
-    drivers.push(newDriver);
-    localStorage.setItem(LOCAL_DRIVERS_KEY, JSON.stringify(drivers));
-    return newDriver;
+    const driver = { id: crypto.randomUUID(), name, phone };
+    const drivers = await this.getDrivers(); drivers.push(driver);
+    localStorage.setItem(LOCAL_DRIVERS_KEY, JSON.stringify(drivers)); return driver;
   },
-
-  // Update an existing driver
   async updateDriver(id, name, phone) {
-    const trimmedName = name.trim();
-    const trimmedPhone = (phone || '').trim();
-
-    if (!trimmedName) throw new Error('Driver name is required');
-    if (!trimmedPhone) throw new Error('Phone number is required');
-
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('drivers')
-          .update({ name: trimmedName, phone: trimmedPhone })
-          .eq('id', id)
-          .select()
-          .single();
-        if (error) throw error;
-        return data;
-      } catch (err) {
-        console.warn('Supabase updateDriver error:', err);
-      }
+    name = name.trim(); phone = phone.trim();
+    if (!name || !phone) throw new Error('Driver name and phone are required');
+    const client = getSupabaseClient();
+    if (client) {
+      const { data, error } = await client.from('drivers').update({ name, phone }).eq('id', id).select().single();
+      if (error) throw error;
+      return data;
     }
-
-    const drivers = await this.getDrivers();
-    const index = drivers.findIndex(d => d.id === id);
-    if (index !== -1) {
-      drivers[index] = { ...drivers[index], name: trimmedName, phone: trimmedPhone };
-      localStorage.setItem(LOCAL_DRIVERS_KEY, JSON.stringify(drivers));
-      return drivers[index];
-    }
-    throw new Error('Driver not found');
+    const drivers = await this.getDrivers(); const driver = drivers.find(d => d.id === id);
+    if (!driver) throw new Error('Driver not found');
+    Object.assign(driver, { name, phone }); localStorage.setItem(LOCAL_DRIVERS_KEY, JSON.stringify(drivers)); return driver;
   },
-
-  // Delete a driver
   async deleteDriver(id) {
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      try {
-        const { error } = await supabase.from('drivers').delete().eq('id', id);
-        if (error) throw error;
-        return true;
-      } catch (err) {
-        console.warn('Supabase deleteDriver error:', err);
-      }
-    }
-
-    const drivers = await this.getDrivers();
-    const filtered = drivers.filter(d => d.id !== id);
-    localStorage.setItem(LOCAL_DRIVERS_KEY, JSON.stringify(filtered));
-
-    const records = this._getLocalRecords().filter(r => r.driver_id !== id);
-    localStorage.setItem(LOCAL_RECORDS_KEY, JSON.stringify(records));
-    return true;
-  },
-
-  // Fetch all daily records for a specific driver and month
-  async getMonthlyRecords(driverId, year, month) {
-    const formattedMonth = String(month).padStart(2, '0');
-    const startDate = `${year}-${formattedMonth}-01`;
-    const lastDay = new Date(year, month, 0).getDate();
-    const endDate = `${year}-${formattedMonth}-${String(lastDay).padStart(2, '0')}`;
-
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('daily_records')
-          .select('*')
-          .eq('driver_id', driverId)
-          .gte('date', startDate)
-          .lte('date', endDate)
-          .order('date');
-        
-        if (error) throw error;
-        return data || [];
-      } catch (err) {
-        console.warn('Supabase getMonthlyRecords error, using local:', err);
-      }
-    }
-
-    // Local fallback
-    const records = this._getLocalRecords();
-    return records.filter(r => {
-      return r.driver_id === driverId && r.date >= startDate && r.date <= endDate;
-    });
-  },
-
-  // Save or update a single daily record
-  async saveDailyRecord(driverId, date, amount) {
-    const supabase = getSupabaseClient();
-
-    // If clearing amount
-    if (amount === null || amount === undefined || amount === '') {
-      if (supabase) {
+    const client = getSupabaseClient();
+    if (client) {
+      const { data: driver, error: readError } = await client.from('drivers').select('*').eq('id', id).single();
+      if (readError) throw readError;
+      const paths = [driver.profile_photo, ...(driver.aadhaar_photos || []), ...(driver.license_photos || [])].filter(Boolean);
+      // Cascading records and the driver are deleted together by PostgreSQL.
+      // Never remove photos if the database rejects the deletion.
+      const { error } = await client.from('drivers').delete().eq('id', id).select('id').single();
+      if (error) throw error;
+      if (paths.length) {
         try {
-          const { error } = await supabase
-            .from('daily_records')
-            .delete()
-            .match({ driver_id: driverId, date });
-          if (error) throw error;
-          return { success: true, removed: true };
-        } catch (err) {
-          console.warn('Supabase delete daily record error:', err);
+          const { error: photoError } = await client.storage.from('driver-files').remove(paths);
+          if (photoError) throw photoError;
+        } catch {
+          return { warning: 'Driver and records deleted. Some private photos could not be removed from storage; please ask the administrator to finish their removal.' };
         }
       }
-
-      const records = this._getLocalRecords();
-      const filtered = records.filter(r => !(r.driver_id === driverId && r.date === date));
-      localStorage.setItem(LOCAL_RECORDS_KEY, JSON.stringify(filtered));
-      return { success: true, removed: true };
+      return {};
     }
-
-    const numAmount = Number(amount);
-    if (isNaN(numAmount) || numAmount < 0) {
-      throw new Error('Please enter a valid amount');
-    }
-
-    if (supabase) {
-      try {
-        // First try standard upsert
-        const { data, error } = await supabase
-          .from('daily_records')
-          .upsert(
-            {
-              driver_id: driverId,
-              date,
-              amount: numAmount,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'driver_id,date' }
-          )
-          .select()
-          .single();
-
-        if (!error && data) {
-          return { success: true, record: data };
-        }
-
-        // Fallback: If unique constraint is missing on Supabase (error 42P10),
-        // safely check existing row and update or insert:
-        const { data: existing } = await supabase
-          .from('daily_records')
-          .select('id')
-          .eq('driver_id', driverId)
-          .eq('date', date)
-          .maybeSingle();
-
-        if (existing) {
-          const { data: updated, error: uErr } = await supabase
-            .from('daily_records')
-            .update({ amount: numAmount, updated_at: new Date().toISOString() })
-            .eq('id', existing.id)
-            .select()
-            .single();
-          if (!uErr && updated) return { success: true, record: updated };
-        } else {
-          const { data: inserted, error: iErr } = await supabase
-            .from('daily_records')
-            .insert({ driver_id: driverId, date, amount: numAmount })
-            .select()
-            .single();
-          if (!iErr && inserted) return { success: true, record: inserted };
-        }
-      } catch (err) {
-        console.warn('Supabase saveDailyRecord error:', err);
-      }
-    }
-
-    // Local storage fallback
-    const records = this._getLocalRecords();
-    const existingIndex = records.findIndex(r => r.driver_id === driverId && r.date === date);
-
-    if (existingIndex !== -1) {
-      records[existingIndex] = {
-        ...records[existingIndex],
-        amount: numAmount,
-        updated_at: new Date().toISOString(),
-      };
-    } else {
-      records.push({
-        id: crypto.randomUUID ? crypto.randomUUID() : `rec-${Date.now()}`,
-        driver_id: driverId,
-        date,
-        amount: numAmount,
-        created_at: new Date().toISOString(),
-      });
-    }
-
-    localStorage.setItem(LOCAL_RECORDS_KEY, JSON.stringify(records));
-    return { success: true, amount: numAmount };
+    localStorage.setItem(LOCAL_DRIVERS_KEY, JSON.stringify((await this.getDrivers()).filter(d => d.id !== id)));
+    localStorage.setItem(LOCAL_RECORDS_KEY, JSON.stringify(this._getLocalRecords().filter(r => r.driver_id !== id)));
   },
-
-  _getLocalRecords() {
-    try {
-      const stored = localStorage.getItem(LOCAL_RECORDS_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
+  async getMonthlyRecords(driverId, year, month) {
+    const prefix = year + '-' + String(month).padStart(2, '0') + '-';
+    const start = prefix + '01', end = prefix + String(new Date(year, month, 0).getDate());
+    const client = getSupabaseClient();
+    if (client) {
+      const { data, error } = await client.from('daily_records').select('*').eq('driver_id', driverId).gte('date', start).lte('date', end).order('date');
+      if (error) throw error; return data || [];
     }
+    return this._getLocalRecords().filter(r => r.driver_id === driverId && r.date >= start && r.date <= end);
   },
-
+  async saveDailyRecord(driverId, date, amount, pendingAmount = 0, notes = '') {
+    if (typeof notes !== 'string' || notes.length > 1000) throw new Error('Notes must be 1,000 characters or fewer');
+    const cleanNotes = notes.trim();
+    const clear = (amount === null || amount === undefined || amount === '') && !cleanNotes;
+    const record = { driver_id: driverId, date, amount: Number(amount), pending_amount: Number(pendingAmount || 0), notes: cleanNotes, updated_at: new Date().toISOString() };
+    if (!clear && (!Number.isFinite(record.amount) || record.amount < 0 || !Number.isFinite(record.pending_amount) || record.pending_amount < 0)) throw new Error('Enter valid non-negative amounts');
+    const client = getSupabaseClient();
+    if (client) {
+      const result = clear ? await client.from('daily_records').delete().match({ driver_id: driverId, date }) : await client.from('daily_records').upsert(record, { onConflict: 'driver_id,date' }).select().single();
+      if (result.error) throw result.error;
+      return { success: true, record: result.data, removed: clear };
+    }
+    const records = this._getLocalRecords().filter(r => !(r.driver_id === driverId && r.date === date));
+    if (!clear) records.push({ ...record, id: crypto.randomUUID() });
+    localStorage.setItem(LOCAL_RECORDS_KEY, JSON.stringify(records)); return { success: true, record, removed: clear };
+  },
+  _getLocalRecords() { return JSON.parse(localStorage.getItem(LOCAL_RECORDS_KEY) || '[]'); },
   resetDemoData() {
     localStorage.setItem(LOCAL_DRIVERS_KEY, JSON.stringify(DEFAULT_DRIVERS));
     localStorage.setItem(LOCAL_RECORDS_KEY, JSON.stringify(getInitialSampleRecords()));

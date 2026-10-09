@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.daily_records (
     driver_id UUID NOT NULL REFERENCES public.drivers(id) ON DELETE CASCADE,
     date DATE NOT NULL,
     amount NUMERIC(10, 2) NOT NULL,
+    notes TEXT NOT NULL DEFAULT '' CHECK (char_length(notes) <= 1000),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     -- Enforce 1 record per driver per date

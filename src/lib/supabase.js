@@ -20,12 +20,22 @@ const getSupabaseConfig = () => {
   return { supabaseUrl, supabaseKey, isConfigured: isValid };
 };
 
+let cachedClient;
+let cachedConfig;
+
 export const getSupabaseClient = () => {
   const { supabaseUrl, supabaseKey, isConfigured } = getSupabaseConfig();
   if (!isConfigured) return null;
 
   try {
-    return createClient(supabaseUrl, supabaseKey);
+    const config = supabaseUrl + supabaseKey;
+    if (cachedConfig !== config) {
+      cachedClient = createClient(supabaseUrl, supabaseKey, {
+        auth: { storage: sessionStorage },
+      });
+      cachedConfig = config;
+    }
+    return cachedClient;
   } catch (error) {
     console.warn('Failed to initialize Supabase client:', error);
     return null;

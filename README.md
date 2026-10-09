@@ -126,3 +126,17 @@ npm run build
 ```
 
 Open `http://localhost:5173` on your browser or phone.
+
+## Private profiles, Due amounts and passcode login
+
+Existing projects: run supabase/profile-upgrade.sql in the Supabase SQL editor. New projects: run schema.sql first, then profile-upgrade.sql. The migration replaces public access policies on both register tables with owner-only policies.
+
+Login is passcode-only through the register-login Supabase Edge Function. There is no email setup. See supabase/PASSCODE_SETUP.md for the migration, secret and deployment steps. The passcode belongs in Supabase secrets, never in frontend .env or VITE_* variables. Supabase sessions are kept in browser session storage, and Log out ends access on the device. Run passcode-login.sql after profile-upgrade.sql.
+
+Photos go into the private driver-files bucket (5 MB per JPG/PNG/WebP), while drivers stores profile_photo, aadhaar_photos and license_photos paths. Add a driver, then open its profile using the pencil. Choose photos to preview them locally, discard any unwanted selections, then use Upload photos (or Replace photo). Saved images appear as thumbnails and can be opened in a full-screen viewer. Contact details save separately without closing the profile. Aadhaar and licence allow multiple images. View links expire after five minutes. No PAN field is included. Uploads require Supabase; demo mode cannot store identity documents.
+
+Daily entries now contain Amount and independently entered Pending amount, shown as Due. Blank Amount with a Due value saves Amount as zero; clearing a day removes both values. Monthly totals and PDFs include both columns. Cloud failures are shown instead of silently saving to local demo storage.
+
+Driver deletion requires typing DELETE in a confirmation dialog. For existing databases, run `supabase/driver-delete-fix.sql` once in Supabase SQL Editor to repair the daily-record foreign key so deleting a driver also deletes their records atomically. This migration does not delete existing data. Photos are removed only after the database deletion succeeds; a storage cleanup failure is reported separately.
+
+Daily notes: run supabase/daily-notes.sql once for an existing database. The final Notes column shows a small note icon; tap it to read the note in a compact popup without changing row height. Tap + Add for an empty note, or tap the day to edit an existing note. Notes are included in PDF exports. Driver photos are larger; tap a photo on the list or register to open the profile.

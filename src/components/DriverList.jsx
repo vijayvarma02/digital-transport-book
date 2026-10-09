@@ -1,20 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
 import { dataService } from '../services/dataService';
+import DriverAvatar from './DriverAvatar';
 import AddDriverModal from './AddDriverModal';
 
 export default function DriverList({ onSelectDriver }) {
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const loadDriversData = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const driverList = await dataService.getDrivers();
       setDrivers(driverList);
     } catch (err) {
-      console.error('Failed to load drivers:', err);
+      setLoadError(err.message || 'Could not load drivers');
     } finally {
       setLoading(false);
     }
@@ -42,6 +45,7 @@ export default function DriverList({ onSelectDriver }) {
 
       {/* Main Driver List */}
       <main className="flex-1 max-w-md w-full mx-auto px-4 py-4">
+        {loadError && <p role="alert" className="p-3 text-red-700">{loadError} <button onClick={loadDriversData} className="underline">Retry</button></p>}
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center text-slate-500">
             <div className="animate-spin rounded-full h-8 w-8 border-3 border-blue-600 border-t-transparent mb-3"></div>
@@ -51,12 +55,13 @@ export default function DriverList({ onSelectDriver }) {
           <div className="space-y-2.5">
             {drivers.map((driver) => {
               return (
-                <button
+                <div
                   key={driver.id}
-                  onClick={() => onSelectDriver(driver)}
                   className="w-full bg-white hover:bg-blue-50/50 active:bg-blue-100/70 border border-slate-200 hover:border-blue-300 rounded-xl px-5 py-4 flex items-center justify-between transition-colors text-left shadow-xs min-h-[64px]"
                 >
-                  <div className="flex-1 min-w-0 pr-3">
+                  <button type="button" onClick={() => onSelectDriver(driver, true)} aria-label={`Open ${driver.name} profile`} className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-blue-600"><DriverAvatar driver={driver} /></button>
+                  <button type="button" onClick={() => onSelectDriver(driver)} aria-label={`Open ${driver.name} records`} className="flex min-w-0 flex-1 items-center text-left focus-visible:outline-2 focus-visible:outline-blue-600">
+                  <div className="flex-1 min-w-0 px-3">
                     <span className="text-xl font-bold text-slate-900 block truncate">
                       {driver.name}
                     </span>
@@ -70,7 +75,8 @@ export default function DriverList({ onSelectDriver }) {
                   <div className="shrink-0">
                     <ChevronRight size={24} className="text-slate-400" />
                   </div>
-                </button>
+                  </button>
+                </div>
               );
             })}
 

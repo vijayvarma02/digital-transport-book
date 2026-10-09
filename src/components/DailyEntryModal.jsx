@@ -8,13 +8,19 @@ export default function DailyEntryModal({
   driverName,
   dateString,
   currentAmount,
+  currentPending,
+  currentNotes,
+  focusNotes = false,
   onSave,
 }) {
   const [amount, setAmount] = useState(() => (
     currentAmount !== null && currentAmount !== undefined ? String(currentAmount) : ''
   ));
+  const [pending, setPending] = useState(String(currentPending ?? ''));
+  const [notes, setNotes] = useState(currentNotes || '');
   const [status, setStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const [errorMessage, setErrorMessage] = useState('');
+  const notesRef = useRef(null);
   const inputRef = useRef(null);
 
   // Quick preset amounts common for daily transport drivers
@@ -23,13 +29,12 @@ export default function DailyEntryModal({
   useEffect(() => {
     // Focus input after opening
     const timer = setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus();
-        inputRef.current.select();
-      }
+      const input = focusNotes ? notesRef.current : inputRef.current;
+      input?.focus();
+      input?.select();
     }, 100);
     return () => clearTimeout(timer);
-  }, []);
+  }, [focusNotes]);
 
   if (!isOpen) return null;
 
@@ -42,14 +47,16 @@ export default function DailyEntryModal({
 
     try {
       // If blank, treat as clearing the record
-      const valueToSave = amount.trim() === '' ? null : Number(amount.trim());
-      if (valueToSave !== null && (isNaN(valueToSave) || valueToSave < 0)) {
+      const valueToSave = amount.trim() === '' && pending.trim() === '' && notes.trim() === '' ? null : Number(amount || 0);
+      const due = Number(pending || 0);
+      if (!Number.isFinite(due) || due < 0) throw new Error('Invalid pending amount');
+      if (valueToSave !== null && (!Number.isFinite(valueToSave) || valueToSave < 0)) {
         setStatus('error');
         setErrorMessage('Please enter a valid number');
         return;
       }
 
-      await onSave(dateString, valueToSave);
+      await onSave(dateString, valueToSave, due, notes.trim());
       setStatus('saved');
       
       // Auto close after brief "Saved" confirmation
@@ -65,7 +72,7 @@ export default function DailyEntryModal({
   const handleClear = async () => {
     setStatus('saving');
     try {
-      await onSave(dateString, null);
+      await onSave(dateString, null, null, '');
       setStatus('saved');
       setTimeout(() => {
         onClose();
@@ -82,7 +89,7 @@ export default function DailyEntryModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 border border-slate-200 animate-in fade-in slide-in-from-bottom duration-200"
+        className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 max-h-[90dvh] overflow-y-auto border border-slate-200 animate-in fade-in slide-in-from-bottom duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header */}
@@ -121,7 +128,7 @@ export default function DailyEntryModal({
                 inputMode="numeric"
                 pattern="[0-9]*"
                 min="0"
-                step="1"
+                step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0"
@@ -130,6 +137,10 @@ export default function DailyEntryModal({
             </div>
           </div>
 
+          <div>
+            <label htmlFor="daily-pending" className="block text-sm font-semibold text-slate-600 mb-2">Pending amount (Due)</label>
+            <input id="daily-pending" type="number" min="0" step="0.01" inputMode="decimal" value={pending} onChange={e => setPending(e.target.value)} placeholder="0" className="w-full text-2xl font-bold px-4 py-3 border-2 border-slate-300 rounded-xl" />
+          </div>
           {/* Quick preset amount chips for one-tap entry */}
           <div>
             <div className="text-xs font-medium text-slate-500 mb-2">Quick amounts:</div>
@@ -151,6 +162,11 @@ export default function DailyEntryModal({
             </div>
           </div>
 
+          <div>
+            <label htmlFor="daily-notes" className="block text-sm font-semibold text-slate-600 mb-2">Notes <span className="font-normal text-slate-400">(optional)</span></label>
+            <textarea ref={notesRef} id="daily-notes" value={notes} onChange={e => setNotes(e.target.value)} maxLength={1000} rows={3} placeholder="Trip details, payment reminders…" className="w-full resize-y rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-3 text-base focus:outline-none focus:border-blue-600" />
+            <p className="text-right text-xs text-slate-400">{notes.length}/1,000</p>
+          </div>
           {/* Error Message */}
           {errorMessage && (
             <div className="p-3 bg-red-50 text-red-700 text-sm font-medium rounded-lg border border-red-200">
@@ -192,7 +208,7 @@ export default function DailyEntryModal({
                 disabled={status === 'saving' || status === 'saved'}
                 className="w-full py-3 text-sm font-semibold text-slate-500 hover:text-red-600 bg-transparent rounded-lg active:bg-slate-100 min-h-[44px]"
               >
-                Clear this day (leave blank —)
+                Clear amounts and notes for this day
               </button>
             )}
           </div>

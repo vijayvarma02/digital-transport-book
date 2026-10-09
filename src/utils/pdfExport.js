@@ -10,6 +10,7 @@ export const exportDriverMonthlyPDF = ({
   daysInMonth,
   recordsMap,
   totalAmount,
+  totalDue,
 }) => {
   const monthName = MONTH_NAMES[month - 1];
   const doc = new jsPDF({
@@ -68,7 +69,7 @@ export const exportDriverMonthlyPDF = ({
 
   // 3. Prepare Table Data
   const tableData = daysInMonth.map((dayItem) => {
-    const rawAmount = recordsMap[dayItem.dateString];
+    const rawAmount = recordsMap[dayItem.dateString]?.amount;
     const hasAmount = rawAmount !== null && rawAmount !== undefined && rawAmount !== '';
     const formattedAmount = hasAmount
       ? `Rs. ${Number(rawAmount).toLocaleString('en-IN')}`
@@ -77,6 +78,8 @@ export const exportDriverMonthlyPDF = ({
     return [
       `${dayItem.displayDate} (${dayItem.dayOfWeek})`,
       formattedAmount,
+      recordsMap[dayItem.dateString] ? `Rs. ${Number(recordsMap[dayItem.dateString].pending_amount || 0).toLocaleString('en-IN')}` : '—',
+      recordsMap[dayItem.dateString]?.notes || '',
     ];
   });
 
@@ -84,7 +87,7 @@ export const exportDriverMonthlyPDF = ({
   autoTable(doc, {
     startY: 55,
     margin: { left: 14, right: 14, bottom: 25 },
-    head: [['Date', 'Amount']],
+    head: [['Date', 'Amount', 'Due', 'Notes']],
     body: tableData,
     theme: 'grid',
     headStyles: {
@@ -95,8 +98,10 @@ export const exportDriverMonthlyPDF = ({
       halign: 'left',
     },
     columnStyles: {
-      0: { cellWidth: 'auto', fontStyle: 'bold', halign: 'left' },
-      1: { cellWidth: 50, halign: 'right', fontStyle: 'bold' },
+      3: { cellWidth: 'auto', halign: 'left' },
+      0: { cellWidth: 35, fontStyle: 'bold', halign: 'left' },
+      2: { cellWidth: 35, halign: 'right', fontStyle: 'bold' },
+      1: { cellWidth: 45, halign: 'right', fontStyle: 'bold' },
     },
     styles: {
       font: 'helvetica',
@@ -112,6 +117,8 @@ export const exportDriverMonthlyPDF = ({
       [
         'Total Amount',
         `Rs. ${Number(totalAmount).toLocaleString('en-IN')}`,
+        `Rs. ${Number(totalDue || 0).toLocaleString('en-IN')}`,
+        '',
       ],
     ],
     footStyles: {
