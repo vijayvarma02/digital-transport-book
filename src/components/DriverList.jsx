@@ -5,16 +5,16 @@ import DriverAvatar from './DriverAvatar';
 import AddDriverModal from './AddDriverModal';
 
 export default function DriverList({ onSelectDriver }) {
-  const [drivers, setDrivers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [drivers, setDrivers] = useState(() => dataService.getCachedDrivers() || []);
+  const [loading, setLoading] = useState(() => !dataService.getCachedDrivers());
   const [loadError, setLoadError] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  const loadDriversData = useCallback(async () => {
-    setLoading(true);
+  const loadDriversData = useCallback(async (force = false) => {
+    if (!dataService.getCachedDrivers()) setLoading(true);
     setLoadError('');
     try {
-      const driverList = await dataService.getDrivers();
+      const driverList = await dataService.getDrivers(force);
       setDrivers(driverList);
     } catch (err) {
       setLoadError(err.message || 'Could not load drivers');
@@ -45,7 +45,7 @@ export default function DriverList({ onSelectDriver }) {
 
       {/* Main Driver List */}
       <main className="flex-1 max-w-md w-full mx-auto px-4 py-4">
-        {loadError && <p role="alert" className="p-3 text-red-700">{loadError} <button onClick={loadDriversData} className="underline">Retry</button></p>}
+        {loadError && <p role="alert" className="p-3 text-red-700">{loadError} <button onClick={() => loadDriversData(true)} className="underline">Retry</button></p>}
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center text-slate-500">
             <div className="animate-spin rounded-full h-8 w-8 border-3 border-blue-600 border-t-transparent mb-3"></div>

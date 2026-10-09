@@ -1,4 +1,5 @@
 import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase';
+import { driverCache } from './driverCache';
 
 const DEFAULT_DRIVERS = [
   { id: '11111111-1111-4111-8111-111111111101', name: 'Ramesh', phone: '9848011223' },
@@ -65,12 +66,15 @@ initLocalStorage();
 
 export const dataService = {
   isConfigured: () => isSupabaseConfigured(),
-  async getDrivers() {
+  getCachedDrivers() { return driverCache.read(getSupabaseClient(), true); },
+  async getDrivers(force = false) {
     const client = getSupabaseClient();
     if (client) {
-      const { data, error } = await client.from('drivers').select('*').order('name');
-      if (error) throw error;
-      return data || [];
+      return driverCache.load(client, async () => {
+        const { data, error } = await client.from('drivers').select('*').order('name');
+        if (error) throw error;
+        return data || [];
+      }, force);
     }
     return deduplicateDrivers(JSON.parse(localStorage.getItem(LOCAL_DRIVERS_KEY) || '[]'));
   },
@@ -81,6 +85,7 @@ export const dataService = {
     if (client) {
       const { data, error } = await client.from('drivers').insert({ name, phone }).select().single();
       if (error) throw error;
+      driverCache.upsert(client, data);
       return data;
     }
     const driver = { id: crypto.randomUUID(), name, phone };
@@ -94,6 +99,7 @@ export const dataService = {
     if (client) {
       const { data, error } = await client.from('drivers').update({ name, phone }).eq('id', id).select().single();
       if (error) throw error;
+      driverCache.upsert(client, data);
       return data;
     }
     const drivers = await this.getDrivers(); const driver = drivers.find(d => d.id === id);
@@ -105,11 +111,12 @@ export const dataService = {
     if (client) {
       const { data: driver, error: readError } = await client.from('drivers').select('*').eq('id', id).single();
       if (readError) throw readError;
-      const paths = [driver.profile_photo, ...(driver.aadhaar_photos || []), ...(driver.license_photos || [])].filter(Boolean);
+      const paths = [driver.profile_photo, driver.profile_thumbnail, ...(driver.aadhaar_photos || []), ...(driver.license_photos || [])].filter(Boolean);
       // Cascading records and the driver are deleted together by PostgreSQL.
       // Never remove photos if the database rejects the deletion.
       const { error } = await client.from('drivers').delete().eq('id', id).select('id').single();
       if (error) throw error;
+      driverCache.remove(client, id);
       if (paths.length) {
         try {
           const { error: photoError } = await client.storage.from('driver-files').remove(paths);

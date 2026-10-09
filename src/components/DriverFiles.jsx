@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, CreditCard, FileCheck2, ImagePlus, ShieldCheck, Trash2, Upload, X, ZoomIn } from 'lucide-react';
+import { usePrivateImage, useVisible } from '../hooks/usePrivateImage';
 import { fileUrl, uploadDriverFiles, removeDriverFile, validateDriverImages } from '../services/fileService';
 
 const sections = [
@@ -8,22 +9,12 @@ const sections = [
   { field: 'license_photos', label: 'Driving licence', hint: 'Add front and back photos', Icon: FileCheck2 },
 ];
 
-function SavedPhoto({ path, label, portrait, disabled, onPreview, onRemove }) {
-  const [url, setUrl] = useState(null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    let active = true;
-    const refresh = async () => {
-      try { const next = await fileUrl(path); if (active) { setUrl(next); setFailed(!next); } }
-      catch { if (active) setFailed(true); }
-    };
-    refresh();
-    const timer = setInterval(refresh, 240000);
-    return () => { active = false; clearInterval(timer); };
-  }, [path]);
-  return <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+function SavedPhoto({ path, thumbnail, label, portrait, disabled, onPreview, onRemove }) {
+  const { ref, visible } = useVisible();
+  const { url, failed, onError } = usePrivateImage(thumbnail || path, visible);
+  return <div ref={ref} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
     <button type="button" disabled={!url || failed || disabled} onClick={() => onPreview({ path, label })} className="relative flex aspect-[4/3] w-full items-center justify-center bg-slate-50" aria-label={`Enlarge ${label}`}>
-      {url && !failed ? <><img src={url} alt={label} onError={() => setFailed(true)} className={`h-full w-full ${portrait ? 'object-cover' : 'object-contain p-2'}`} /><span className="absolute bottom-2 right-2 rounded-full bg-slate-900/70 p-1.5 text-white"><ZoomIn size={15} /></span></> : <span className="p-3 text-xs text-slate-500">{failed ? 'Preview unavailable' : 'Loading photo…'}</span>}
+      {url && !failed ? <><img src={url} alt={label} onError={onError} loading="lazy" decoding="async" className={`h-full w-full ${portrait ? 'object-cover' : 'object-contain p-2'}`} /><span className="absolute bottom-2 right-2 rounded-full bg-slate-900/70 p-1.5 text-white"><ZoomIn size={15} /></span></> : <span className="p-3 text-xs text-slate-500">{failed ? 'Preview unavailable' : 'Loading photo…'}</span>}
     </button>
     <div className="flex items-center justify-between gap-1 px-2 py-1.5"><span className="truncate text-xs font-medium text-slate-600">{label}</span><button type="button" disabled={disabled} onClick={onRemove} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40" aria-label={`Remove ${label}`}><Trash2 size={16} /></button></div>
   </div>;
@@ -84,7 +75,7 @@ export default function DriverFiles({ driver, onUpdated, onBusyChange, disabled 
       const selected = pending[field] || [];
       return <div key={field} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
         <div className="mb-3 flex items-start gap-3"><span className="rounded-xl bg-blue-50 p-2.5 text-blue-700"><Icon size={20} /></span><div className="min-w-0 flex-1"><h5 className="text-sm font-bold text-slate-900">{label}</h5><p className="mt-0.5 text-xs text-slate-500">{hint}</p></div><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${paths.length ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{paths.length ? `${paths.length} saved` : 'Not added'}</span></div>
-        {paths.length > 0 && <div className="mb-3 grid grid-cols-2 gap-2">{paths.map((path, i) => <SavedPhoto key={path} path={path} portrait={field === 'profile_photo'} label={`${label}${paths.length > 1 ? ` ${i + 1}` : ''}`} disabled={locked} onPreview={item => run(async () => { const url = await fileUrl(item.path); if (!url) throw new Error('Could not load this photo.'); setPreview({ url, label: item.label }); })} onRemove={() => run(async () => { onUpdated(await removeDriverFile(driver, field, path)); setNotice(`${label} removed.`); })} />)}</div>}
+        {paths.length > 0 && <div className="mb-3 grid grid-cols-2 gap-2">{paths.map((path, i) => <SavedPhoto key={path} path={path} thumbnail={field === 'profile_photo' ? driver.profile_thumbnail : null} portrait={field === 'profile_photo'} label={`${label}${paths.length > 1 ? ` ${i + 1}` : ''}`} disabled={locked} onPreview={item => run(async () => { const url = await fileUrl(item.path); if (!url) throw new Error('Could not load this photo.'); setPreview({ url, label: item.label }); })} onRemove={() => run(async () => { onUpdated(await removeDriverFile(driver, field, path)); setNotice(`${label} removed.`); })} />)}</div>}
         {selected.length > 0 && <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50/60 p-3">
           <p className="mb-2 text-xs font-bold text-blue-800">Preview · {selected.length} selected</p>
           <div className="grid grid-cols-2 gap-2">{selected.map(item => <div key={item.id} className="overflow-hidden rounded-lg border border-blue-100 bg-white">

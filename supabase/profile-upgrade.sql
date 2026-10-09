@@ -2,6 +2,7 @@
 -- only need this migration). No additional application tables are created.
 BEGIN;
 ALTER TABLE public.drivers ADD COLUMN IF NOT EXISTS profile_photo text;
+ALTER TABLE public.drivers ADD COLUMN IF NOT EXISTS profile_thumbnail text;
 ALTER TABLE public.drivers ADD COLUMN IF NOT EXISTS aadhaar_photos text[] NOT NULL DEFAULT '{}';
 ALTER TABLE public.drivers ADD COLUMN IF NOT EXISTS license_photos text[] NOT NULL DEFAULT '{}';
 ALTER TABLE public.daily_records ADD COLUMN IF NOT EXISTS pending_amount numeric(10,2) NOT NULL DEFAULT 0 CHECK (pending_amount >= 0);

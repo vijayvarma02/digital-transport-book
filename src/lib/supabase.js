@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { clearSessionCaches } from '../services/sessionCache';
 
 const getSupabaseConfig = () => {
   const envUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -22,6 +23,7 @@ const getSupabaseConfig = () => {
 
 let cachedClient;
 let cachedConfig;
+let authSubscription;
 
 export const getSupabaseClient = () => {
   const { supabaseUrl, supabaseKey, isConfigured } = getSupabaseConfig();
@@ -30,10 +32,19 @@ export const getSupabaseClient = () => {
   try {
     const config = supabaseUrl + supabaseKey;
     if (cachedConfig !== config) {
+      authSubscription?.unsubscribe();
+      clearSessionCaches();
       cachedClient = createClient(supabaseUrl, supabaseKey, {
         auth: { storage: sessionStorage },
       });
       cachedConfig = config;
+      let currentUser = null;
+      const { data } = cachedClient.auth.onAuthStateChange((event, session) => {
+        const nextUser = session?.user?.id || null;
+        if (event === 'SIGNED_OUT' || currentUser !== nextUser) clearSessionCaches();
+        currentUser = nextUser;
+      });
+      authSubscription = data.subscription;
     }
     return cachedClient;
   } catch (error) {

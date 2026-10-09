@@ -5,9 +5,9 @@ const vm = require('node:vm');
 const { webcrypto } = require('node:crypto');
 function setup() {
   const store = new Map();
-  const context = { localStorage: { getItem: k => store.get(k) || null, setItem: (k, v) => store.set(k, v) }, crypto: webcrypto, getSupabaseClient: () => null, isSupabaseConfigured: () => false };
+  const context = { driverCache: { read: () => null, load: (_client, fetch) => fetch(), upsert: () => {}, remove: () => {} }, localStorage: { getItem: k => store.get(k) || null, setItem: (k, v) => store.set(k, v) }, crypto: webcrypto, getSupabaseClient: () => null, isSupabaseConfigured: () => false };
   vm.createContext(context);
-  const source = fs.readFileSync('src/services/dataService.js', 'utf8').replace(/^import[^\n]+\n/, '').replace('export const dataService =', 'globalThis.dataService =');
+  const source = fs.readFileSync('src/services/dataService.js', 'utf8').replace(/^import[^\n]+\n/gm, '').replace('export const dataService =', 'globalThis.dataService =');
   vm.runInContext(source, context);
   return { service: context.dataService, context, store };
 }
