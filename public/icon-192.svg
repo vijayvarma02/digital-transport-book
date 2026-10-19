@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <!-- Background -->
+  <rect width="192" height="192" rx="40" fill="#1d4ed8"/>
+  <!-- Truck body -->
+  <rect x="24" y="90" width="110" height="56" rx="8" fill="#ffffff"/>
+  <!-- Truck cab -->
+  <rect x="108" y="74" width="54" height="72" rx="8" fill="#ffffff"/>
+  <!-- Cab window -->
+  <rect x="116" y="82" width="36" height="26" rx="4" fill="#93c5fd"/>
+  <!-- Wheels -->
+  <circle cx="54" cy="152" r="14" fill="#1e293b"/>
+  <circle cx="54" cy="152" r="6" fill="#93c5fd"/>
+  <circle cx="138" cy="152" r="14" fill="#1e293b"/>
+  <circle cx="138" cy="152" r="6" fill="#93c5fd"/>
+  <!-- Record lines on body -->
+  <rect x="34" y="104" width="60" height="5" rx="2.5" fill="#bfdbfe"/>
+  <rect x="34" y="116" width="44" height="5" rx="2.5" fill="#bfdbfe"/>
+  <rect x="34" y="128" width="52" height="5" rx="2.5" fill="#bfdbfe"/>
+  <!-- ARF text -->
+  <text x="96" y="52" font-family="Arial,sans-serif" font-size="22" font-weight="bold" fill="#ffffff" text-anchor="middle" letter-spacing="3">ARF</text>
+</svg>

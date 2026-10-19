@@ -2,6 +2,7 @@ import LoginGate from './components/LoginGate';
 import React, { useState, useEffect } from 'react';
 import DriverList from './components/DriverList';
 import DriverMonthlyRecord from './components/DriverMonthlyRecord';
+import InstallPrompt from './components/InstallPrompt';
 
 export default function App() {
   const [initialDate] = useState(() => new Date());
@@ -44,6 +45,7 @@ export default function App() {
     <LoginGate><div className="min-h-screen bg-slate-100 font-sans text-slate-900 select-none antialiased">
       {/* Mobile container - full bleed on phone screens, centered comfortable max-width on wider screens */}
       <div className="w-full max-w-md mx-auto min-h-screen bg-slate-50 shadow-md">
+        <InstallPrompt />
         {notice && !selectedDriver && <div role="status" className="flex items-start justify-between gap-3 border-b border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900"><p>{notice}</p><button type="button" onClick={() => setNotice('')} aria-label="Dismiss message" className="min-h-9 min-w-9 font-bold">×</button></div>}
         {selectedDriver ? (
           <DriverMonthlyRecord
