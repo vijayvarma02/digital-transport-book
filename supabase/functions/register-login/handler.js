@@ -29,7 +29,7 @@ export function createLoginHandler({ env, createClient }) {
     const serviceKey = env('SUPABASE_SERVICE_ROLE_KEY');
     const url = env('SUPABASE_URL');
     const anonKey = env('SUPABASE_ANON_KEY');
-    if (!secret || secret.length < 8 || secret.length > 256 || !serviceKey || !url || !anonKey) return reply(503, { error: 'Passcode login has not been configured.' });
+    if (!secret || secret.length < 6 || secret.length > 256 || !serviceKey || !url || !anonKey) return reply(503, { error: 'Passcode login has not been configured.' });
     try {
       // Bound the actual streamed body, including requests without Content-Length.
       const reader = request.body?.getReader();
