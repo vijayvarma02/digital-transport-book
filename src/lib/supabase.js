@@ -35,7 +35,7 @@ export const getSupabaseClient = () => {
       authSubscription?.unsubscribe();
       clearSessionCaches();
       cachedClient = createClient(supabaseUrl, supabaseKey, {
-        auth: { storage: sessionStorage },
+        auth: { storage: localStorage },
       });
       cachedConfig = config;
       let currentUser = null;
